@@ -32,7 +32,7 @@ class App extends Component {
                 <div className="wrap">
                 <div className="logo">
                   <Link to={"/books"} className="navbar-brand">
-                    <img src={logo} className="logo" alt="Bunnyshell" />
+                    <img src={logo} className="logo" alt="Bunnyshell is awesome" />
                   </Link>
                 </div>
                 <div className="navbar-nav">

@@ -5,7 +5,7 @@ module.exports = {
   USER: process.env['POSTGRES_USER'],
   PASSWORD: process.env['POSTGRES_PASSWORD'],
   DB: process.env['POSTGRES_DB'],
-  ENDPOINT: process.env['ENDPOINT_ID'],
+  ENDPOINT: process.env['POSTGRES_HOST'].split('.')[0],
   dialect: "postgres",
   pool: {
     max: 5,

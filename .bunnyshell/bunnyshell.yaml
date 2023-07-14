@@ -1,7 +1,6 @@
 kind: Environment
 name: DemoBooks-Integration
 type: primary
-urlHandle: demobooksprod
 environmentVariables:
     NEON_API_TOKEN: '<<BNS_SECRET>>'
     NEON_PROJECT_ID: bold-shadow-168128

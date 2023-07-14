@@ -2,12 +2,8 @@ kind: Environment
 name: DemoBooks-Integration
 type: primary
 environmentVariables:
-    NEON_API_TOKEN: '<<BNS_SECRET>>'
     NEON_PROJECT_ID: bold-shadow-168128
     NEON_SOURCE_BRANCH_ID: br-frosty-mud-840365
-    POSTGRES_DB: '<<BNS_SECRET>>'
-    POSTGRES_PASSWORD: '<<BNS_SECRET>>'
-    POSTGRES_USER: '<<BNS_SECRET>>'
 components:
     -
         kind: Application

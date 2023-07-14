@@ -1,106 +1,84 @@
-kind: Environment
-name: Demo Books
+kind: Environment dfasdlkfjas;dlkf
+name: DemoBooks-Integration
 type: primary
+urlHandle: demobooksprod
 environmentVariables:
-  BACKEND_URL: 'https://api-{{ env.base_domain }}'
-  FRONTEND_URL: 'https://frontend-{{ env.base_domain }}'
-  POSTGRES_DB: bunny_books
-  POSTGRES_PASSWORD: mysecretpassword
-  POSTGRES_USER: postgres
-
+    NEON_API_TOKEN: '<<BNS_SECRET>>'
+    NEON_PROJECT_ID: bold-shadow-168128
+    NEON_SOURCE_BRANCH_ID: br-frosty-mud-840365
+    POSTGRES_DB: '<<BNS_SECRET>>'
+    POSTGRES_PASSWORD: '<<BNS_SECRET>>'
+    POSTGRES_USER: '<<BNS_SECRET>>'
 components:
-  - kind: DockerImage
-    name: frontend-image
-    context: /frontend
-    dockerfile: Dockerfile
-    target: prod
-    args:
-      REACT_APP_BASE_API: '{{ env.vars.BACKEND_URL }}'
-    gitRepo: 'git://github.com/bunnyshellosi/demo-books.git'
-    gitBranch: master
-    gitApplicationPath: /frontend
-
-  - kind: DockerImage
-    name: backend-image
-    context: /backend
-    dockerfile: Dockerfile
-    target: prod
-    gitRepo: 'git://github.com/bunnyshellosi/demo-books.git'
-    gitBranch: master
-    gitApplicationPath: /backend
-
-  - kind: Helm
-    name: postgres
-    runnerImage: 'dtzar/helm-kubectl:3.8.2'
-    deploy:
-      - |
-        cat << EOF > my_values.yaml
-            global:
-                storageClass: bns-network-sc
-            auth:
-                postgresPassword: {{ env.vars.POSTGRES_PASSWORD }}
-                database: {{ env.vars.POSTGRES_DB }}
-        EOF
-      - 'helm repo add bitnami https://charts.bitnami.com/bitnami'
-      - 'helm upgrade --install --namespace {{ env.k8s.namespace }} --post-renderer /bns/helpers/helm/add_labels/kustomize -f my_values.yaml postgres bitnami/postgresql --version 11.9.11'
-      - |
-        POSTGRES_HOST="postgres-postgresql.{{ env.k8s.namespace }}.svc.cluster.local"
-    destroy:
-      - 'helm uninstall postgres --namespace {{ env.k8s.namespace }}'
-    start:
-      - 'kubectl scale --replicas=1 --namespace {{ env.k8s.namespace }} statefulset/postgres-postgresql'
-    stop:
-      - 'kubectl scale --replicas=0 --namespace {{ env.k8s.namespace }} statefulset/postgres-postgresql'
-    exportVariables:
-      - POSTGRES_HOST
-
-  - kind: Helm
-    name: api
-    runnerImage: 'dtzar/helm-kubectl:3.8.2'
-    deploy:
-      - |
-        cat << EOF > my_values.yaml
-            serviceImage: {{ components.backend-image.image }}
-            replicas: 1
-            ingress:
-                className: bns-nginx
-                host: api-{{ env.base_domain }}
-            postgres:
-                host: '{{ components.postgres.exported.POSTGRES_HOST }}'
-                db: '{{ env.vars.POSTGRES_DB }}'
-                user: '{{ env.vars.POSTGRES_USER }}'
-                password: '{{ env.vars.POSTGRES_PASSWORD }}'
-            frontendUrl: '{{ env.vars.FRONTEND_URL }}'
-        EOF
-      - 'helm upgrade --install --namespace {{ env.k8s.namespace }} --dependency-update --post-renderer /bns/helpers/helm/add_labels/kustomize -f my_values.yaml api-{{ env.unique }} ./helm/backend'
-    destroy:
-      - 'helm uninstall api-{{ env.unique }} --namespace {{ env.k8s.namespace }}'
-    start:
-      - 'helm upgrade --namespace {{ env.k8s.namespace }} --post-renderer /bns/helpers/helm/add_labels/kustomize --reuse-values --set replicas=1 api-{{ env.unique }} ./helm/backend'
-    stop:
-      - 'helm upgrade --namespace {{ env.k8s.namespace }} --post-renderer /bns/helpers/helm/add_labels/kustomize --reuse-values --set replicas=0 api-{{ env.unique }} ./helm/backend'
-    gitRepo: 'git://github.com/bunnyshellosi/demo-books.git'
-    gitBranch: master
-    gitApplicationPath: /helm/backend
-
-  - kind: KubernetesManifest
-    name: frontend
-    runnerImage: 'alpine/k8s:1.22.15'
-    deploy:
-      - 'cd manifests/frontend'
-      - 'kustomize create --autodetect --recursive --labels=app.kubernetes.io/instance-frontend:bns,app.kubernetes.io/part-of:env-{{ env.unique }} --namespace {{ env.k8s.namespace }}'
-      - 'kustomize edit set image needsimage={{ components.frontend-image.image }}'
-      - 'sed -i "s/frontend.example.com/frontend-{{ env.base_domain }}/g" ingress.yaml'
-      - 'sed -i "s/ingressClassName: nginx/ingressClassName: bns-nginx/g" ingress.yaml'
-      - 'kubectl apply -k .'
-    destroy:
-      - 'cd manifests/frontend'
-      - 'kustomize create --autodetect --recursive --namespace {{ env.k8s.namespace }}'
-      - 'kubectl delete -k .'
-    start:
-      - 'kubectl scale --replicas=1 --namespace {{ env.k8s.namespace }} deployment/frontend'
-    stop:
-      - 'kubectl scale --replicas=0 --namespace {{ env.k8s.namespace }} deployment/frontend'
-    gitRepo: 'git://github.com/bunnyshellosi/demo-books.git'
-    gitBranch: master
-    gitApplicationPath: /manifests/frontend
+    -
+        kind: Application
+        name: backend
+        gitRepo: 'https://github.com/dakar91/demo-books.git'
+        gitBranch: neon-database
+        gitApplicationPath: backend
+        dockerCompose:
+            build:
+                context: ./backend
+                dockerfile: Dockerfile
+                target: prod
+            environment:
+                FRONTEND_URL: 'https://{{ components.frontend.ingress.hosts[0] }}'
+                POSTGRES_HOST: '{{ components.neon-database.exported.DB_HOST }}'
+            ports:
+                - '3080:3080'
+        hosts:
+            -
+                hostname: 'backend-{{ env.base_domain }}'
+                path: /
+                servicePort: 3080
+    -
+        kind: Application
+        name: frontend
+        gitRepo: 'https://github.com/dakar91/demo-books.git'
+        gitBranch: neon-database
+        gitApplicationPath: frontend
+        dockerCompose:
+            build:
+                context: ./frontend
+                dockerfile: Dockerfile
+                args:
+                    REACT_APP_BASE_API: 'https://{{ components.backend.ingress.hosts[0] }}'
+                target: prod
+            ports:
+                - '8080:8080'
+        hosts:
+            -
+                hostname: 'frontend-{{ env.base_domain }}'
+                path: /
+                servicePort: 8080
+    -
+        kind: GenericComponent
+        name: neon-database
+        runnerImage: 'bunnyshell/basic-runner-image:0.1.0'
+        deploy:
+            - 'curl -L -o create_database.sh https://raw.githubusercontent.com/bunnyshell/connectors/main/neon-database/scripts/create_database.sh'
+            - '. create_database.sh'
+            - |
+                echo $DB_HOST
+        destroy:
+            - 'curl -L -o delete_database.sh https://raw.githubusercontent.com/bunnyshell/connectors/main/neon-database/scripts/delete_database.sh'
+            - '. delete_database.sh'
+        start:
+            - 'echo "Start scripts are not needed. Neon has auto-idle and auto-start capabilities, so control from Bunnyshell is not needed."'
+        stop:
+            - 'echo "Stop scripts are not needed. Neon has auto-idle and auto-start capabilities, so control from Bunnyshell is not needed."'
+        exportVariables:
+            - DB_HOST
+            - BRANCH_ID
+        environment:
+            API_TOKEN: '{{ env.vars.NEON_API_TOKEN }}'
+            BRANCH_ID: '{{ components.neon-database.exported.BRANCH_ID }}'
+            DB_HOST: '{{ components.neon-database.exported.DB_HOST }}'
+            PROJECT_ID: '{{ env.vars.NEON_PROJECT_ID }}'
+            SOURCE_BRANCH_ID: '{{ env.vars.NEON_SOURCE_BRANCH_ID }}'
+            TARGET_BRANCH_NAME: 'bns-{{ env.unique}}'
+volumes:
+    -
+        name: db-data
+        size: 1Gi
+        type: disk
